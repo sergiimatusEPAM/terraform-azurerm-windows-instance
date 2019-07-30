@@ -9,7 +9,7 @@
  *
  *```hcl
  * module "dcos-windows-instances" {
- *   source  = "dcos-terraform/windows-instances/azure"
+ *   source  = "dcos-terraform/windows-instance/azure"
  *   version = "~> 0.0.1"
  *
  *   cluster_name = "production"
@@ -32,12 +32,16 @@ resource "random_string" "random_password" {
   min_special = 1
 }
 
+//lifecycle {
+//   ignore_changes = ["plaintext_password"]
+//}
+
 locals {
-  password = "${random_string.random_password}"
+  password = "${random_string.random_password.result}"
 }
 
 // Instances is spawning the VMs to be used with DC/OS (bootstrap)
-module "dcos-windows-instances" {
+module "dcos-windows-instance" {
   source  = "dcos-terraform/instance/azurerm"
   version = "~> 0.2.0"
 
