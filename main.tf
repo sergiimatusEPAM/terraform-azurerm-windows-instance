@@ -41,7 +41,7 @@ locals {
 }
 
 // Instances is spawning the VMs to be used with DC/OS (bootstrap)
-module "dcos-windows-instance" {
+module "dcos-windows-instances" {
   source  = "dcos-terraform/instance/azurerm"
   version = "~> 0.2.0"
 
