@@ -69,4 +69,5 @@ module "dcos-windows-instances" {
   hostname_format                   = "${var.hostname_format}"
   subnet_id                         = "${var.subnet_id}"
   avset_platform_fault_domain_count = "${var.avset_platform_fault_domain_count}"
+  is_windows                        = "${var.is_windows}}"
 }
