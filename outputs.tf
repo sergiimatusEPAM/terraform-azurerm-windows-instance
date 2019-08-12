@@ -1,11 +1,11 @@
 output "admin_username" {
   description = "SSH User"
-  value       = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}"
+  value       = "${local.admin_username}"
 }
 
-output "admin_password" {
+output "windows_passwords" {
   description = "Windows admin password"
-  value       = "${var.admin_password}"
+  value       = "${local.admin_password}"
 }
 
 output "private_ips" {

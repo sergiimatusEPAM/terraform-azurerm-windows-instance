@@ -43,15 +43,12 @@ resource "random_string" "random_password" {
   min_special = 1
 }
 
-//lifecycle {
-//   ignore_changes = ["plaintext_password"]
-//}
-
 locals {
-  cluster_name = "${var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name}"
-  private_key  = "${file(var.ssh_private_key_filename)}"
-  agent        = "${var.ssh_private_key_filename == "/dev/null" ? true : false}"
-  admin_password = "${random_string.random_password.result}"
+  cluster_name    = "${var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name}"
+  private_key     = "${file(var.ssh_private_key_filename)}"
+  agent           = "${var.ssh_private_key_filename == "/dev/null" ? true : false}"
+  admin_username  = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}" 
+  admin_password  = "${random_string.random_password.result}"
   image_publisher = "${length(var.image) > 0 ? lookup(var.image, "publisher", "") : module.dcos-tested-oses.azure_publisher }"
   image_sku       = "${length(var.image) > 0 ? lookup(var.image, "sku", "") : module.dcos-tested-oses.azure_sku }"
   image_version   = "${length(var.image) > 0 ? lookup(var.image, "version", "") : module.dcos-tested-oses.azure_version }"
@@ -76,9 +73,8 @@ resource "azurerm_public_ip" "instance_public_ip" {
   name                = "${format(var.hostname_format, count.index + 1, local.cluster_name)}-pub-ip"
   location            = "${var.location}"
   resource_group_name = "${var.resource_group_name}"
-  allocation_method   = "Dynamic"
-  domain_name_label   = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
-
+  allocation_method   = "Static"
+  domain_name_label   = "${format(var.hostname_format, (count.index + 1), local.cluster_name)}"
   tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
 }
@@ -131,12 +127,13 @@ resource "azurerm_virtual_machine" "windows_instance" {
     version   = "${contains(keys(var.image), "id") ? "" : module.dcos-tested-oses.azure_version}"
     id        = "${lookup(var.image, "id", "")}"
   }
-
+  
   storage_os_disk {
     name              = "os-disk-${format(var.hostname_format, count.index + 1, local.cluster_name)}"
-    caching           = "ReadOnly"
+    caching           = "ReadWrite"
     create_option     = "FromImage"
     managed_disk_type = "${var.disk_type}"
+    os_type           = "windows"
   }
 
   storage_data_disk {
@@ -150,23 +147,47 @@ resource "azurerm_virtual_machine" "windows_instance" {
 
   os_profile {
     computer_name  = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
-    admin_username = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}"
-    admin_password = "${var.admin_password}"
+    admin_username = "${local.admin_username}"
+    admin_password = "${local.admin_password}"
     custom_data    = "${var.custom_data}"
   }
 
   os_profile_windows_config {
-    provision_vm_agent = true
+    provision_vm_agent        = true
     enable_automatic_upgrades = false
+    
+    winrm = { 
+      protocol = "http"
+    } 
+  } 
 
-    additional_unattend_config {
-      component = "oobeSystem"
-      content = "Microsoft-Windows-Shell-Sleep"
-      pass = "AutoLogon"
-      setting_name = "<AutoLogon><Password><Value>${var.admin_password}</Value></Password><Enabled>true</Enabled><LogonCount>1</LogonCount><Username>${var.admin_username}</Username></AutoLogon>"
+  tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
+                                "Cluster", local.cluster_name))}"
+}
+
+resource "azurerm_virtual_machine_extension" "winrm_setup" {
+  name                 = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
+  location             = "${var.location}"
+  resource_group_name  = "${var.resource_group_name}"  
+  virtual_machine_name = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
+  publisher            = "Microsoft.Compute"
+  type                 = "CustomScriptExtension"
+  type_handler_version = "1.8"
+  count                = "${var.num}"
+  depends_on           = ["azurerm_virtual_machine.windows_instance"]
+
+  settings = <<SETTINGS
+    {
+        "fileUris": ["https://raw.githubusercontent.com/sergiimatusEPAM/terraform-azurerm-windows-instance/master/winrm_setup.ps1"],
+        "commandToExecute": "powershell.exe -ExecutionPolicy unrestricted -NoProfile -NonInteractive -File winrm_setup.ps1"
     }
+SETTINGS
+  
+  lifecycle {
+    prevent_destroy = true 
   }
 
   tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
 }
+
