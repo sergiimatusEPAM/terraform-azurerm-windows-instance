@@ -183,9 +183,9 @@ resource "azurerm_virtual_machine_extension" "winrm_setup" {
     }
 SETTINGS
   
-  lifecycle {
-    prevent_destroy = true 
-  }
+  //lifecycle {
+  //  prevent_destroy = true 
+  //}
 
   tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
