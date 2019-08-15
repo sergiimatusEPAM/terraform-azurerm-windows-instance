@@ -158,7 +158,7 @@ resource "azurerm_virtual_machine" "windows_instance" {
     enable_automatic_upgrades = false
 
     winrm = {
-      protocol = "https"
+      protocol = "http"
     }
   }
 
