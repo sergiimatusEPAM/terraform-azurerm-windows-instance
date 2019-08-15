@@ -43,7 +43,7 @@ resource "random_password" "password" {
   min_numeric      = 1
   min_special      = 1
   special          = true
-  override_special = "!@$%&*-_=+?" 
+  override_special = "!@$%&*-_=+?"
 }
 
 locals {
