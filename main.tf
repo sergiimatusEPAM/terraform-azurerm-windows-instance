@@ -12,7 +12,7 @@
  *   source  = "dcos-terraform/windows-instance/azurerm"
  *   version = "~> 0.0.1"
  *
- *   cluster_name = "production"
+ *   cluster_name = "prod"
  *   subnet_id = "myid"
  *   security_group_ids = ["sg-12345678"]
  *
@@ -35,25 +35,26 @@ module "dcos-tested-oses" {
   os = "${var.dcos_instance_os}"
 }
 
-resource "random_string" "password" {
-  count       = "${var.num}"
-  length      = 32
-  min_upper   = 1
-  min_lower   = 1
-  min_numeric = 1
-  min_special = 1
+resource "random_password" "password" {
+  count            = "${var.num}"
+  length           = 32
+  min_upper        = 1
+  min_lower        = 1
+  min_numeric      = 1
+  min_special      = 1
+  special          = true
+  override_special = "!@$%&*-_=+?" 
 }
 
 locals {
   cluster_name    = "${var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name}"
   private_key     = "${file(var.ssh_private_key_filename)}"
   agent           = "${var.ssh_private_key_filename == "/dev/null" ? true : false}"
-  admin_username  = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}" 
+  admin_username  = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}"
   image_publisher = "${length(var.image) > 0 ? lookup(var.image, "publisher", "") : module.dcos-tested-oses.azure_publisher }"
   image_sku       = "${length(var.image) > 0 ? lookup(var.image, "sku", "") : module.dcos-tested-oses.azure_sku }"
   image_version   = "${length(var.image) > 0 ? lookup(var.image, "version", "") : module.dcos-tested-oses.azure_version }"
   image_offer     = "${length(var.image) > 0 ? lookup(var.image, "offer", "") : module.dcos-tested-oses.azure_offer }"
-
 }
 
 # instance Node
@@ -75,7 +76,7 @@ resource "azurerm_public_ip" "instance_public_ip" {
   resource_group_name = "${var.resource_group_name}"
   allocation_method   = "Static"
   domain_name_label   = "${format(var.hostname_format, (count.index + 1), local.cluster_name)}"
-  tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
+  tags                = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
 }
 
@@ -127,7 +128,7 @@ resource "azurerm_virtual_machine" "windows_instance" {
     version   = "${contains(keys(var.image), "id") ? "" : module.dcos-tested-oses.azure_version}"
     id        = "${lookup(var.image, "id", "")}"
   }
-  
+
   storage_os_disk {
     name              = "os-disk-${format(var.hostname_format, count.index + 1, local.cluster_name)}"
     caching           = "ReadWrite"
@@ -148,18 +149,18 @@ resource "azurerm_virtual_machine" "windows_instance" {
   os_profile {
     computer_name  = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
     admin_username = "${local.admin_username}"
-    admin_password = "${element(random_string.password.*.result, count.index)}"
+    admin_password = "${element(random_password.password.*.result, count.index)}"
     custom_data    = "${var.custom_data}"
   }
 
   os_profile_windows_config {
     provision_vm_agent        = true
     enable_automatic_upgrades = false
-    
-    winrm = { 
-      protocol = "http"
-    } 
-  } 
+
+    winrm = {
+      protocol = "https"
+    }
+  }
 
   tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
@@ -168,7 +169,7 @@ resource "azurerm_virtual_machine" "windows_instance" {
 resource "azurerm_virtual_machine_extension" "winrm_setup" {
   name                 = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
   location             = "${var.location}"
-  resource_group_name  = "${var.resource_group_name}"  
+  resource_group_name  = "${var.resource_group_name}"
   virtual_machine_name = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
   publisher            = "Microsoft.Compute"
   type                 = "CustomScriptExtension"
@@ -182,8 +183,7 @@ resource "azurerm_virtual_machine_extension" "winrm_setup" {
         "commandToExecute": "powershell.exe -ExecutionPolicy unrestricted -NoProfile -NonInteractive -File winrm_setup.ps1"
     }
   SETTINGS
-  
+
   tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
 }
-
