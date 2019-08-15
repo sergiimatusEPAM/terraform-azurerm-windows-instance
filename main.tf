@@ -9,7 +9,7 @@
  *
  *```hcl
  * module "dcos-windows-instances" {
- *   source  = "dcos-terraform/windows-instance/azure"
+ *   source  = "dcos-terraform/windows-instance/azurerm"
  *   version = "~> 0.0.1"
  *
  *   cluster_name = "production"
@@ -49,7 +49,6 @@ locals {
   private_key     = "${file(var.ssh_private_key_filename)}"
   agent           = "${var.ssh_private_key_filename == "/dev/null" ? true : false}"
   admin_username  = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}" 
-  //admin_password  = "${random_string.password.result}"
   image_publisher = "${length(var.image) > 0 ? lookup(var.image, "publisher", "") : module.dcos-tested-oses.azure_publisher }"
   image_sku       = "${length(var.image) > 0 ? lookup(var.image, "sku", "") : module.dcos-tested-oses.azure_sku }"
   image_version   = "${length(var.image) > 0 ? lookup(var.image, "version", "") : module.dcos-tested-oses.azure_version }"
@@ -182,12 +181,8 @@ resource "azurerm_virtual_machine_extension" "winrm_setup" {
         "fileUris": ["https://raw.githubusercontent.com/sergiimatusEPAM/terraform-azurerm-windows-instance/master/winrm_setup.ps1"],
         "commandToExecute": "powershell.exe -ExecutionPolicy unrestricted -NoProfile -NonInteractive -File winrm_setup.ps1"
     }
-SETTINGS
+  SETTINGS
   
-  //lifecycle {
-  //  prevent_destroy = true 
-  //}
-
   tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), var.location, local.cluster_name),
                                 "Cluster", local.cluster_name))}"
 }
