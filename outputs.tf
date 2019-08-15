@@ -5,7 +5,7 @@ output "admin_username" {
 
 output "windows_passwords" {
   description = "Windows admin password"
-  value       = "${local.admin_password}"
+  value       = ["${random_string.password.*.result}"]
 }
 
 output "private_ips" {

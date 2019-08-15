@@ -35,7 +35,8 @@ module "dcos-tested-oses" {
   os = "${var.dcos_instance_os}"
 }
 
-resource "random_string" "random_password" {
+resource "random_string" "password" {
+  count       = "${var.num}"
   length      = 32
   min_upper   = 1
   min_lower   = 1
@@ -48,7 +49,7 @@ locals {
   private_key     = "${file(var.ssh_private_key_filename)}"
   agent           = "${var.ssh_private_key_filename == "/dev/null" ? true : false}"
   admin_username  = "${coalesce(var.admin_username, module.dcos-tested-oses.user)}" 
-  admin_password  = "${random_string.random_password.result}"
+  //admin_password  = "${random_string.password.result}"
   image_publisher = "${length(var.image) > 0 ? lookup(var.image, "publisher", "") : module.dcos-tested-oses.azure_publisher }"
   image_sku       = "${length(var.image) > 0 ? lookup(var.image, "sku", "") : module.dcos-tested-oses.azure_sku }"
   image_version   = "${length(var.image) > 0 ? lookup(var.image, "version", "") : module.dcos-tested-oses.azure_version }"
@@ -148,7 +149,7 @@ resource "azurerm_virtual_machine" "windows_instance" {
   os_profile {
     computer_name  = "${format(var.hostname_format, count.index + 1, local.cluster_name)}"
     admin_username = "${local.admin_username}"
-    admin_password = "${local.admin_password}"
+    admin_password = "${element(random_string.password.*.result, count.index)}"
     custom_data    = "${var.custom_data}"
   }
 
